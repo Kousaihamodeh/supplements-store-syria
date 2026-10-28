@@ -1,0 +1,26 @@
+# Dependencies
+/node_modules
+/.pnpm
+/.yarn
+
+# Next.js build output
+/.next/
+/out/
+
+# Environment files
+.env*.local
+.env
+
+# IDE & OS files
+.DS_Store
+*.pem
+.vscode/
+
+# Exclude local duplicate backup archives & temp import folder from Git/Vercel bundle
+# while keeping prisma/dev.db and public/uploads/ included in deployment!
+/backups/
+/new-products/
+/prisma/dev.db.bak
+/prisma/dev.db-wal
+/prisma/dev.db-shm
+/scripts/import-batch-65.ts
