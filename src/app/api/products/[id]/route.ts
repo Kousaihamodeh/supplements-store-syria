@@ -86,11 +86,14 @@ export async function PUT(
           isNew: Boolean(isNew),
           isOnSale: Boolean(isOnSale),
           images: {
-            create: (images || []).map((img: any, idx: number) => ({
-              url: img.url,
-              isMain: img.isMain ?? idx === 0,
-              sortOrder: img.sortOrder ?? idx,
-            })),
+            create: (() => {
+              const hasMain = (images || []).some((img: any) => Boolean(img.isMain));
+              return (images || []).map((img: any, idx: number) => ({
+                url: img.url,
+                isMain: hasMain ? Boolean(img.isMain) : idx === 0,
+                sortOrder: img.sortOrder ?? idx,
+              }));
+            })(),
           },
           variants: {
             create: (variants || []).map((v: any) => ({

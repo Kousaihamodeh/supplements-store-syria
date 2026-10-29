@@ -191,12 +191,19 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
       const url = isEdit ? `/api/products/${initialData.id}` : '/api/products';
       const method = isEdit ? 'PUT' : 'POST';
 
+      const hasMain = images.some((img) => img.isMain);
+      const sanitizedImages = images.map((img, idx) => ({
+        ...img,
+        isMain: hasMain ? Boolean(img.isMain) : idx === 0,
+        sortOrder: idx,
+      }));
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          images,
+          images: sanitizedImages,
           variants,
         }),
       });
@@ -204,6 +211,7 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'فشل الحفظ');
 
+      alert(isEdit ? 'تم تعديل المنتج وحفظ الصور بنجاح!' : 'تم إضافة ونشر المنتج بنجاح!');
       router.push('/admin/products');
       router.refresh();
     } catch (err: any) {

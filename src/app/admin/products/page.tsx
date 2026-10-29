@@ -13,7 +13,7 @@ export default async function AdminProductsPage() {
     include: {
       category: true,
       brand: true,
-      images: { where: { isMain: true } },
+      images: { orderBy: { sortOrder: 'asc' } },
     },
   });
 
@@ -57,7 +57,7 @@ export default async function AdminProductsPage() {
                 </tr>
               ) : (
                 products.map((p) => {
-                  const img = p.images[0]?.url || 'https://images.unsplash.com/photo-1579722821273-0f6c7d44362f?w=200&auto=format&fit=crop&q=80';
+                  const img = p.images.find((i) => i.isMain)?.url || p.images[0]?.url || 'https://images.unsplash.com/photo-1579722821273-0f6c7d44362f?w=200&auto=format&fit=crop&q=80';
                   return (
                     <tr key={p.id} className="hover:bg-dark-950/50 transition-colors">
                       <td className="p-4">

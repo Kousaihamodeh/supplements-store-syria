@@ -12,16 +12,26 @@ function resolveDatabaseUrl(): string {
         const candidatePaths = [
           path.join(process.cwd(), 'prisma', 'dev.db'),
           path.join(process.cwd(), 'dev.db'),
+          path.join(__dirname, '..', '..', 'prisma', 'dev.db'),
+          path.join(__dirname, '..', 'prisma', 'dev.db'),
+          path.join(__dirname, 'prisma', 'dev.db'),
+          '/var/task/prisma/dev.db',
+          '/var/task/dev.db',
         ];
+
         for (const src of candidatePaths) {
           if (fs.existsSync(src)) {
             fs.copyFileSync(src, tmpDbPath);
+            try {
+              fs.chmodSync(tmpDbPath, 0o666);
+            } catch (e) {}
             break;
           }
         }
       }
+
       if (fs.existsSync(tmpDbPath)) {
-        return `file:${tmpDbPath}`;
+        return `file:${tmpDbPath}?connection_limit=1`;
       }
     } catch (err) {
       console.error('Vercel /tmp database setup warning:', err);
@@ -50,10 +60,9 @@ export const db =
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 
-// Configure SQLite WAL mode and busy_timeout for high concurrency & non-blocking writes
 if (!globalForPrisma.prisma) {
-  db.$queryRawUnsafe('PRAGMA journal_mode = WAL;')
-    .then(() => db.$queryRawUnsafe('PRAGMA busy_timeout = 15000;'))
-    .catch((err) => console.error('Pragma WAL setup error:', err));
+  // Use busy_timeout so SQLite waits up to 15s instead of throwing SQLITE_BUSY
+  db.$queryRawUnsafe('PRAGMA busy_timeout = 15000;')
+    .catch((err) => console.error('Pragma busy_timeout setup error:', err));
   globalForPrisma.prisma = db;
 }
