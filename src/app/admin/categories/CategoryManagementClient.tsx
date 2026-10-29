@@ -20,15 +20,57 @@ export default function CategoryManagementClient({ initialCategories }: { initia
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      if (file.type === 'image/gif' || file.type === 'image/svg+xml') {
+        resolve(file);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1200;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', 0.85);
+          } else {
+            resolve(file);
+          }
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploading(true);
-    const data = new FormData();
-    data.append('files', files[0]);
-
     try {
+      const data = new FormData();
+      const compressedBlob = await compressImage(files[0]);
+      data.append('files', compressedBlob, files[0].name.replace(/\.[^/.]+$/, '.jpg'));
+
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: data,
@@ -44,6 +86,7 @@ export default function CategoryManagementClient({ initialCategories }: { initia
       alert(err.message || 'حدث خطأ في رفع الصورة');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 

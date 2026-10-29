@@ -41,6 +41,59 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
   );
 
   const [uploading, setUploading] = useState(false);
+  const [directUrl, setDirectUrl] = useState('');
+
+  // Helper to compress image on client-side before upload to prevent network timeouts and read-only errors
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      // If SVG or GIF, don't re-compress on canvas
+      if (file.type === 'image/gif' || file.type === 'image/svg+xml') {
+        resolve(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1200;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(
+              (blob) => {
+                resolve(blob || file);
+              },
+              'image/jpeg',
+              0.85
+            );
+          } else {
+            resolve(file);
+          }
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
 
   // Multi Image Drag & Drop / Upload Handler
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,17 +101,23 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
     if (!files || files.length === 0) return;
 
     setUploading(true);
-    const data = new FormData();
-    Array.from(files).forEach((file) => data.append('files', file));
 
     try {
+      const data = new FormData();
+      for (const file of Array.from(files)) {
+        const compressedBlob = await compressImage(file);
+        data.append('files', compressedBlob, file.name.replace(/\.[^/.]+$/, '.jpg'));
+      }
+
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: data,
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Failed to upload images');
+      if (!res.ok) {
+        throw new Error(result.error || 'فشل في رفع الصور');
+      }
 
       const newImgs = result.urls.map((url: string, idx: number) => ({
         url,
@@ -68,10 +127,24 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
 
       setImages((prev) => [...prev, ...newImgs]);
     } catch (err: any) {
-      alert(err.message || 'Error uploading images');
+      alert(err.message || 'حدث خطأ أثناء رفع الصور');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
+  };
+
+  const handleAddDirectUrl = () => {
+    if (!directUrl.trim()) return;
+    setImages((prev) => [
+      ...prev,
+      {
+        url: directUrl.trim(),
+        isMain: prev.length === 0,
+        sortOrder: prev.length,
+      },
+    ]);
+    setDirectUrl('');
   };
 
   const setMainImage = (index: number) => {
@@ -162,6 +235,25 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
             className="hidden"
           />
         </label>
+
+        {/* Or enter Direct Image URL */}
+        <div className="flex gap-2">
+          <input
+            type="url"
+            placeholder="أو الصق رابط صورة مباشر من الإنترنت (https://...)"
+            value={directUrl}
+            onChange={(e) => setDirectUrl(e.target.value)}
+            className="flex-1 bg-dark-950 border border-dark-700 rounded-xl px-4 py-2 text-xs text-white dir-ltr focus:border-neon focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleAddDirectUrl}
+            disabled={!directUrl.trim()}
+            className="px-4 py-2 bg-dark-800 hover:bg-dark-700 text-neon font-bold text-xs rounded-xl border border-dark-600 disabled:opacity-50"
+          >
+            إضافة الرابط
+          </button>
+        </div>
 
         {/* Image Grid Preview & Main Selector */}
         {images.length > 0 && (
