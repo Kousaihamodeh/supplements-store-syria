@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { Upload, X, Plus, Trash2, Star, Check, Copy } from 'lucide-react';
+import { Upload, X, Plus, Trash2, Star, Check, Copy, RefreshCw, Image as ImageIcon } from 'lucide-react';
 
 interface ProductFormProps {
   initialData?: any;
@@ -42,6 +41,7 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
 
   const [uploading, setUploading] = useState(false);
   const [directUrl, setDirectUrl] = useState('');
+  const replaceInputRef = useRef<HTMLInputElement>(null);
 
   // Helper to compress image on client-side before upload to prevent network timeouts and read-only errors
   const compressImage = (file: File): Promise<Blob> => {
@@ -119,18 +119,78 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
         throw new Error(result.error || 'فشل في رفع الصور');
       }
 
+      // When newly uploaded, mark the first newly uploaded image as main and demote any previous images!
       const newImgs = result.urls.map((url: string, idx: number) => ({
         url,
-        isMain: images.length === 0 && idx === 0,
-        sortOrder: images.length + idx,
+        isMain: idx === 0,
+        sortOrder: idx,
       }));
 
-      setImages((prev) => [...prev, ...newImgs]);
+      setImages((prev) => {
+        // Demote previous images to isMain: false so the new upload becomes the main image!
+        const previousDemoted = prev.map((img) => ({
+          ...img,
+          isMain: false,
+        }));
+        return [...newImgs, ...previousDemoted];
+      });
     } catch (err: any) {
       alert(err.message || 'حدث خطأ أثناء رفع الصور');
     } finally {
       setUploading(false);
       e.target.value = '';
+    }
+  };
+
+  // Dedicated Replace Main Image Handler
+  const handleReplaceImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const file = files[0];
+      const compressedBlob = await compressImage(file);
+      const data = new FormData();
+      data.append('files', compressedBlob, file.name.replace(/\.[^/.]+$/, '.jpg'));
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: data,
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'فشل في رفع الصورة');
+
+      const newUrl = result.urls[0];
+      if (!newUrl) throw new Error('لم يتم استلام رابط الصورة');
+
+      // Replace main image or replace entire image list with this new primary image
+      setImages((prev) => {
+        if (prev.length === 0) {
+          return [{ url: newUrl, isMain: true, sortOrder: 0 }];
+        }
+        // If there's an image marked isMain, replace that exact image!
+        const mainIdx = prev.findIndex((img) => img.isMain);
+        const targetIdx = mainIdx >= 0 ? mainIdx : 0;
+        const next = [...prev];
+        next[targetIdx] = { url: newUrl, isMain: true, sortOrder: 0 };
+        return next;
+      });
+
+      alert('تم استبدال الصورة بنجاح! اضغط على (حفظ التعديلات) في الأسفل لتثبيت التغيير.');
+    } catch (err: any) {
+      alert(err.message || 'حدث خطأ أثناء استبدال الصورة');
+    } finally {
+      setUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleClearImages = () => {
+    if (images.length === 0) return;
+    if (confirm('هل تريد حذف جميع الصور الحالية لرفع صورة جديدة بدلاً منها؟')) {
+      setImages([]);
     }
   };
 
@@ -212,8 +272,7 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
       if (!res.ok) throw new Error(data.error || 'فشل الحفظ');
 
       alert(isEdit ? 'تم تعديل المنتج وحفظ الصور بنجاح!' : 'تم إضافة ونشر المنتج بنجاح!');
-      router.push('/admin/products');
-      router.refresh();
+      window.location.href = '/admin/products';
     } catch (err: any) {
       alert(err.message || 'حدث خطأ في عملية الحفظ');
     } finally {
@@ -225,27 +284,136 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
     <form onSubmit={handleSubmit} className="space-y-8 max-w-5xl mx-auto">
       
       {/* 1. Multi Image Upload Manager */}
-      <div className="bg-dark-900 p-6 rounded-2xl border border-dark-800 space-y-4">
-        <h3 className="font-extrabold text-base text-white">صور المنتج / Multi-Image Upload</h3>
+      <div className="bg-dark-900 p-6 rounded-2xl border border-dark-800 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-dark-800 pb-3">
+          <div>
+            <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-neon" />
+              <span>صور المنتج / Product Images</span>
+            </h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              يمكنك استبدال الصورة الحالية مباشرة، أو رفع عدة صور لمعرض المنتج
+            </p>
+          </div>
 
-        {/* Drag & Drop Upload Zone */}
-        <label className="border-2 border-dashed border-dark-700 hover:border-neon rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer transition-colors bg-dark-950/50">
-          <Upload className="w-10 h-10 text-neon mb-2" />
-          <span className="text-sm font-bold text-white">
-            {uploading ? 'جاري رفع الصور...' : 'اسحب الصور وأفلتها هنا، أو اضغط للاختيار من جهازك'}
-          </span>
-          <span className="text-xs text-zinc-500 mt-1">يدعم رفع عدة صور دفعة واحدة (JPG, PNG, WEBP)</span>
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-        </label>
+          {images.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0">
+              <input
+                ref={replaceInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleReplaceImage}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => replaceInputRef.current?.click()}
+                disabled={uploading}
+                className="px-3.5 py-2 bg-neon/10 hover:bg-neon/20 text-neon border border-neon/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${uploading ? 'animate-spin' : ''}`} />
+                <span>{uploading ? 'جاري الرفع...' : 'استبدال الصورة الرئيسية بملف جديد'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearImages}
+                className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                title="حذف جميع الصور"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>حذف الكل</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Current Images Gallery / Thumbnails */}
+        {images.length > 0 && (
+          <div className="space-y-3">
+            <div className="text-xs font-bold text-zinc-300 flex items-center justify-between">
+              <span>الصور المرفقة حالياً ({images.length})</span>
+              <span className="text-[11px] text-zinc-500">⭐ الصورة المميزة بالإطار الأخضر هي التي تظهر في المتجر</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {images.map((img, idx) => (
+                <div
+                  key={idx}
+                  className={`group relative rounded-xl overflow-hidden bg-dark-950 border-2 transition-all ${
+                    img.isMain ? 'border-neon ring-2 ring-neon/40 shadow-md shadow-neon/10' : 'border-dark-700 hover:border-dark-500'
+                  }`}
+                >
+                  <div className="aspect-square w-full overflow-hidden bg-dark-950">
+                    <img
+                      src={img.url}
+                      alt={`Product preview ${idx}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  
+                  {/* Main Badge */}
+                  {img.isMain && (
+                    <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md bg-neon text-dark-950 font-black text-[10px] shadow">
+                      ⭐ رئيسية
+                    </span>
+                  )}
+
+                  {/* Actions Bar */}
+                  <div className="p-1.5 bg-dark-900/95 border-t border-dark-800 flex items-center justify-between gap-1">
+                    {!img.isMain ? (
+                      <button
+                        type="button"
+                        onClick={() => setMainImage(idx)}
+                        className="text-[10px] font-bold text-zinc-400 hover:text-neon flex items-center gap-1 py-1 px-1.5 rounded hover:bg-dark-800 transition-colors"
+                        title="تعيين كصورة رئيسية للمتجر"
+                      >
+                        <Star className="w-3 h-3 text-neon" />
+                        <span>رئيسية</span>
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-bold text-neon px-1">المعروضة</span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="text-[10px] font-bold text-rose-400 hover:text-rose-200 flex items-center gap-1 py-1 px-1.5 rounded hover:bg-rose-950/60 transition-colors ml-auto"
+                      title="حذف هذه الصورة"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>حذف</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Drag & Drop Upload Zone for Additional or New Images */}
+        <div className="space-y-2 pt-2">
+          <label className="text-xs font-bold text-zinc-300 block">
+            {images.length > 0 ? 'إضافة صور إضافية للمعرض أو رفع صور جديدة:' : 'رفع صور للمنتج:'}
+          </label>
+          <label className="border-2 border-dashed border-dark-700 hover:border-neon rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors bg-dark-950/40 hover:bg-dark-950">
+            <Upload className="w-8 h-8 text-neon mb-2" />
+            <span className="text-sm font-bold text-white text-center">
+              {uploading ? 'جاري رفع ومعالجة الصور...' : 'اسحب الصور وأفلتها هنا، أو اضغط للاختيار من جهازك'}
+            </span>
+            <span className="text-xs text-zinc-500 mt-1">يدعم رفع عدة صور دفعة واحدة (JPG, PNG, WEBP)</span>
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </label>
+        </div>
 
         {/* Or enter Direct Image URL */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-1">
           <input
             type="url"
             placeholder="أو الصق رابط صورة مباشر من الإنترنت (https://...)"
@@ -263,50 +431,16 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
           </button>
         </div>
 
-        {/* Image Grid Preview & Main Selector */}
-        {images.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 pt-4 border-t border-dark-800">
-            {images.map((img, idx) => (
-              <div
-                key={idx}
-                className={`relative aspect-square rounded-xl overflow-hidden bg-dark-950 border-2 ${
-                  img.isMain ? 'border-neon ring-2 ring-neon/40' : 'border-dark-700'
-                }`}
-              >
-                <img src={img.url} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
-                
-                {/* Main Badge */}
-                {img.isMain && (
-                  <span className="absolute top-1 ltr:left-1 rtl:right-1 px-1.5 py-0.5 rounded bg-neon text-dark-950 font-black text-[9px]">
-                    الرئيسية
-                  </span>
-                )}
-
-                {/* Actions */}
-                <div className="absolute bottom-1 right-1 flex gap-1">
-                  {!img.isMain && (
-                    <button
-                      type="button"
-                      onClick={() => setMainImage(idx)}
-                      className="p-1 rounded bg-dark-900/90 text-zinc-300 hover:text-neon"
-                      title="تعيين كصورة رئيسية"
-                    >
-                      <Star className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="p-1 rounded bg-rose-950/90 text-rose-300 hover:text-rose-100"
-                    title="حذف الصورة"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+        <div className="p-3 bg-neon/5 border border-neon/20 rounded-xl text-xs text-zinc-300 space-y-1">
+          <div className="font-bold text-neon flex items-center gap-1.5">
+            <span>💡 طريقة تعديل صورة المنتج بسهولة:</span>
           </div>
-        )}
+          <ol className="list-decimal list-inside space-y-0.5 text-zinc-400 text-[11px]">
+            <li>اضغط على زر <strong>«استبدال الصورة الرئيسية بملف جديد»</strong> لاختيار الصورة الجديدة من جهازك مباشرة.</li>
+            <li>أو احذف الصورة القديمة بزر <strong>«حذف»</strong> ثم اسحب الصورة الجديدة إلى مربع الرفع.</li>
+            <li>بعد ظهور الصورة الجديدة، انزل لأسفل الصفحة واضغط <strong>«حفظ التعديلات»</strong> لتثبيتها في المتجر فوراً.</li>
+          </ol>
+        </div>
       </div>
 
       {/* 2. Basic Information (Bilingual) */}
