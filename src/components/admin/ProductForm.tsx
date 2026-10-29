@@ -273,7 +273,7 @@ export function ProductForm({ initialData, categories, brands }: ProductFormProp
                   img.isMain ? 'border-neon ring-2 ring-neon/40' : 'border-dark-700'
                 }`}
               >
-                <Image src={img.url} alt={`Upload ${idx}`} fill className="object-cover" />
+                <img src={img.url} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
                 
                 {/* Main Badge */}
                 {img.isMain && (

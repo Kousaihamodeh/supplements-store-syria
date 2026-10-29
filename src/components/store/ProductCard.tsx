@@ -77,12 +77,11 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Image & Quick View Link */}
       <Link href={`/product/${product.slug}`} className="block relative aspect-square bg-dark-950 overflow-hidden">
-        <Image
+        <img
           src={mainImage}
           alt={title}
-          fill
-          className="object-cover group-hover:scale-105 transition-transform duration-500"
-          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          loading="lazy"
         />
         {product.stock <= 0 && (
           <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm flex items-center justify-center p-2 text-center">

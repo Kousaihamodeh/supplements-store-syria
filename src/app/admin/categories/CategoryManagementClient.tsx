@@ -177,7 +177,7 @@ export default function CategoryManagementClient({ initialCategories }: { initia
             
             {formData.image ? (
               <div className="relative w-full h-36 rounded-xl overflow-hidden bg-dark-950 border border-dark-700 group mb-2">
-                <Image src={formData.image} alt="Preview" fill className="object-cover" />
+                <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-dark-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <button
                     type="button"
@@ -287,7 +287,7 @@ export default function CategoryManagementClient({ initialCategories }: { initia
                     <td className="p-4">
                       <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-dark-950 border border-dark-700 flex items-center justify-center">
                         {c.image ? (
-                          <Image src={c.image} alt={c.nameAr} fill className="object-cover" />
+                          <img src={c.image} alt={c.nameAr} className="w-full h-full object-cover" />
                         ) : (
                           <Layers className="w-6 h-6 text-zinc-600" />
                         )}

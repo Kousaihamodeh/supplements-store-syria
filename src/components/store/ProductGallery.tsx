@@ -17,13 +17,11 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
   return (
     <div className="space-y-4">
       {/* Main Image Display Box */}
-      <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-dark-900 border border-dark-700 shadow-xl group">
-        <Image
+      <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-dark-900 border border-dark-700 shadow-xl group flex items-center justify-center">
+        <img
           src={selectedImage}
           alt={title}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          priority
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
       </div>
 
@@ -40,7 +38,7 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
                   : 'border-dark-700 opacity-60 hover:opacity-100'
               }`}
             >
-              <Image src={img.url} alt={`${title} ${idx + 1}`} fill className="object-cover" />
+              <img src={img.url} alt={`${title} ${idx + 1}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

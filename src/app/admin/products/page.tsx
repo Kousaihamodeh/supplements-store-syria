@@ -62,7 +62,7 @@ export default async function AdminProductsPage() {
                     <tr key={p.id} className="hover:bg-dark-950/50 transition-colors">
                       <td className="p-4">
                         <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-dark-950 border border-dark-700">
-                          <Image src={img} alt={p.nameAr} fill className="object-cover" />
+                          <img src={img} alt={p.nameAr} className="w-full h-full object-cover" />
                         </div>
                       </td>
                       <td className="p-4">
