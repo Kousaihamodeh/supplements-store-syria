@@ -24,3 +24,5 @@
 /prisma/dev.db-wal
 /prisma/dev.db-shm
 /scripts/import-batch-65.ts
+/scripts/update-coupons-shipping.js
+tsconfig.tsbuildinfo

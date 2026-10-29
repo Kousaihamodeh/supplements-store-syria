@@ -28,3 +28,5 @@ export async function getAdminFromCookies(): Promise<AdminTokenPayload | null> {
   if (!token) return null;
   return verifyAdminToken(token);
 }
+
+export const getCurrentAdmin = getAdminFromCookies;

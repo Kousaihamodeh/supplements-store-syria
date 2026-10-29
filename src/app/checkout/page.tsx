@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/providers/LanguageProvider';
 import { useCart } from '@/components/providers/CartProvider';
-import { formatPrice } from '@/lib/utils';
-import { ShoppingBag, CheckCircle, MessageCircle, ArrowLeft, ArrowRight, ShieldCheck, MapPin, Truck } from 'lucide-react';
+import { formatPrice, formatShippingFee } from '@/lib/utils';
+import { ShoppingBag, CheckCircle, MessageCircle, ArrowLeft, ArrowRight, ShieldCheck, MapPin, Truck, Ticket, Tag } from 'lucide-react';
 
 interface ShippingArea {
   id: string;
@@ -22,8 +22,19 @@ export default function CheckoutPage() {
   const isRtl = locale === 'ar';
 
   const [shippingAreas, setShippingAreas] = useState<ShippingArea[]>([]);
-  const [selectedGovernorate, setSelectedGovernorate] = useState<string>('');
-  const [shippingFee, setShippingFee] = useState<number>(0);
+  const [selectedGovernorate, setSelectedGovernorate] = useState<string>('دمشق');
+  const [shippingFee, setShippingFee] = useState<number>(30000);
+
+  // Coupon state
+  const [couponInput, setCouponInput] = useState<string>('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountType: string;
+    discountValue: number;
+    discountAmount: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -40,12 +51,11 @@ export default function CheckoutPage() {
     fetch('/api/shipping')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setShippingAreas(data);
-          if (data.length > 0) {
-            setSelectedGovernorate(data[0].governorateAr);
-            setShippingFee(data[0].shippingFee);
-          }
+          const defaultGov = data.find((a) => a.governorateAr === 'دمشق') || data[0];
+          setSelectedGovernorate(defaultGov.governorateAr);
+          setShippingFee(defaultGov.shippingFee);
         }
       })
       .catch((err) => console.error('Failed to load shipping areas', err));
@@ -59,11 +69,48 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setCouponError(null);
+    setIsValidatingCoupon(true);
+
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: couponInput.trim().toUpperCase(),
+          subtotal: cartTotal,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setCouponError(data.error || 'كوبون الخصم غير صالح');
+        setAppliedCoupon(null);
+      } else {
+        setAppliedCoupon(data);
+        setCouponError(null);
+      }
+    } catch (err: any) {
+      setCouponError('تعذر فحص الكوبون');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError(null);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const grandTotal = cartTotal + shippingFee;
+  const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const productsFinalTotal = Math.max(0, cartTotal - discountAmount);
 
   const handleSubmitOrder = async (e: React.FormEvent, sendWhatsApp = false) => {
     e.preventDefault();
@@ -86,6 +133,7 @@ export default function CheckoutPage() {
           address: formData.address,
           notes: formData.notes,
           shippingFee,
+          couponCode: appliedCoupon ? appliedCoupon.code : null,
           items: cartItems.map((item) => ({
             productId: item.productId,
             nameAr: item.nameAr,
@@ -111,6 +159,11 @@ export default function CheckoutPage() {
           })
           .join('\n');
 
+        const shippingText = formatShippingFee(shippingFee, selectedGovernorate, locale);
+        const couponText = appliedCoupon 
+          ? `\n🎟️ كوبون خصم: ${appliedCoupon.code} (-${appliedCoupon.discountAmount} $)`
+          : '';
+
         const text = encodeURIComponent(
           `*طلب جديد من موقع SUPPLEMENTS STORE*\n` +
           `رقم الطلب: ${data.orderNumber}\n` +
@@ -118,12 +171,14 @@ export default function CheckoutPage() {
           `الهاتف: ${formData.phone}\n` +
           `المحافظة: ${selectedGovernorate}\n` +
           `المنطقة/المدينة: ${formData.cityArea}\n` +
-          `العنوان: ${formData.address}\n\n` +
-          `*المنتجات المطلوبة:*\n` +
+          `العنوان: ${formData.address}\n` +
+          (formData.notes ? `ملاحظات: ${formData.notes}\n` : '') +
+          `\n*المنتجات المطلوبة:*\n` +
           itemsFormatted +
-          `\n\nالمجموع الفرعي: ${cartTotal} $\n` +
-          `أجور الشحن: ${shippingFee} $\n` +
-          `*الإجمالي: ${grandTotal} $*`
+          `\n\nالمجموع الفرعي للمنتجات: ${cartTotal} $` +
+          couponText +
+          `\n*إجمالي المنتجات: ${productsFinalTotal} $*` +
+          `\nأجور التوصيل/الشحن: ${shippingText}`
         );
         window.open(`https://wa.me/963938229497?text=${text}`, '_blank');
       }
@@ -156,8 +211,20 @@ export default function CheckoutPage() {
             <span>{isRtl ? 'المحافظة والعنوان:' : 'Address:'}</span>
             <span className="font-bold text-white">{orderCreated.governorate} - {orderCreated.address}</span>
           </div>
+          {orderCreated.discount > 0 && (
+            <div className="flex justify-between border-b border-dark-800 pb-2 text-emerald-400 font-bold">
+              <span>{isRtl ? 'الخصم المطبق:' : 'Discount:'}</span>
+              <span>- {formatPrice(orderCreated.discount, locale)}</span>
+            </div>
+          )}
+          <div className="flex justify-between border-b border-dark-800 pb-2">
+            <span>{isRtl ? 'أجور التوصيل والشحن:' : 'Shipping Fee:'}</span>
+            <span className="font-bold text-zinc-200">
+              {formatShippingFee(orderCreated.shippingFee, orderCreated.governorate, locale)}
+            </span>
+          </div>
           <div className="flex justify-between pt-2 text-base font-black text-white">
-            <span>{isRtl ? 'المبلغ الإجمالي:' : 'Total Amount:'}</span>
+            <span>{isRtl ? 'إجمالي المنتجات:' : 'Products Total:'}</span>
             <span className="text-neon">{formatPrice(orderCreated.total, locale)}</span>
           </div>
         </div>
@@ -250,7 +317,7 @@ export default function CheckoutPage() {
                 >
                   {shippingAreas.map((area) => (
                     <option key={area.id} value={area.governorateAr}>
-                      {isRtl ? area.governorateAr : area.governorateEn} ({formatPrice(area.shippingFee, locale)})
+                      {isRtl ? area.governorateAr : area.governorateEn} ({formatShippingFee(area.shippingFee, area.governorateAr, locale)})
                     </option>
                   ))}
                 </select>
@@ -323,20 +390,77 @@ export default function CheckoutPage() {
             ))}
           </div>
 
+          {/* Coupon Code Section */}
+          <div className="p-4 bg-dark-950 rounded-xl border border-dark-800 space-y-2">
+            <label className="text-xs font-bold text-white flex items-center gap-1.5">
+              <Ticket className="w-4 h-4 text-neon" />
+              <span>{isRtl ? 'هل لديك كوبون خصم؟' : 'Have a coupon code?'}</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder={isRtl ? 'أدخل رمز الكوبون' : 'Enter coupon code'}
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                disabled={Boolean(appliedCoupon)}
+                className="flex-1 bg-dark-900 border border-dark-700 rounded-xl px-3 py-2 text-xs text-white uppercase font-mono tracking-wider focus:border-neon focus:outline-none"
+              />
+              {appliedCoupon ? (
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="px-3 py-2 bg-rose-950 text-rose-300 border border-rose-800 rounded-xl text-xs font-bold hover:bg-rose-900"
+                >
+                  {isRtl ? 'إلغاء' : 'Remove'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={isValidatingCoupon || !couponInput.trim()}
+                  className="px-4 py-2 bg-neon text-dark-950 font-black rounded-xl text-xs hover:bg-neon-bright transition-all disabled:opacity-50"
+                >
+                  {isValidatingCoupon ? '...' : (isRtl ? 'تطبيق' : 'Apply')}
+                </button>
+              )}
+            </div>
+
+            {couponError && (
+              <p className="text-[11px] text-rose-400 font-bold">{couponError}</p>
+            )}
+
+            {appliedCoupon && (
+              <div className="flex items-center justify-between text-xs text-emerald-400 font-bold pt-1">
+                <span>تم تطبيق الكوبون ({appliedCoupon.code})</span>
+                <span>- {formatPrice(appliedCoupon.discountAmount, locale)}</span>
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2 pt-2 text-sm border-t border-dark-800">
             <div className="flex justify-between text-zinc-300">
               <span>{t.cartSubtotal}</span>
               <span className="font-bold">{formatPrice(cartTotal, locale)}</span>
             </div>
+
+            {appliedCoupon && (
+              <div className="flex justify-between text-emerald-400 font-bold">
+                <span>{isRtl ? 'خصم الكوبون:' : 'Coupon Discount:'}</span>
+                <span>- {formatPrice(discountAmount, locale)}</span>
+              </div>
+            )}
+
             <div className="flex justify-between text-zinc-300">
               <span>{t.shippingFee} ({selectedGovernorate})</span>
-              <span className="font-bold text-neon">{formatPrice(shippingFee, locale)}</span>
+              <span className="font-bold text-zinc-100">
+                {formatShippingFee(shippingFee, selectedGovernorate, locale)}
+              </span>
             </div>
           </div>
 
           <div className="pt-4 border-t border-dark-800 flex justify-between items-center text-xl font-black">
-            <span>{t.cartTotal}</span>
-            <span className="text-neon text-2xl">{formatPrice(grandTotal, locale)}</span>
+            <span>{isRtl ? 'إجمالي المنتجات:' : 'Products Total:'}</span>
+            <span className="text-neon text-2xl">{formatPrice(productsFinalTotal, locale)}</span>
           </div>
 
           <div className="space-y-3 pt-4">

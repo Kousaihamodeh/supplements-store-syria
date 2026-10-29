@@ -16,6 +16,7 @@ export async function POST(request: Request) {
       items, // array of { productId, variantInfo, quantity }
       shippingFee,
       isDirectShippingOrder,
+      couponCode,
     } = body;
 
     // 1. Server-side validation of customer info
@@ -108,7 +109,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'لم يتم العثور على منتجات صالحة في الطلب' }, { status: 400 });
     }
 
-    const calculatedTotal = calculatedSubtotal + verifiedShippingFee;
+    // Process coupon if provided
+    let calculatedDiscount = 0;
+    let appliedCouponId: string | null = null;
+    let validCouponCode: string | null = null;
+
+    if (couponCode && typeof couponCode === 'string') {
+      const cleanCode = couponCode.trim().toUpperCase();
+      const dbCoupon = await db.coupon.findUnique({
+        where: { code: cleanCode },
+      });
+
+      if (
+        dbCoupon &&
+        dbCoupon.isActive &&
+        (!dbCoupon.expiresAt || new Date(dbCoupon.expiresAt) >= new Date()) &&
+        (!dbCoupon.maxUses || dbCoupon.usedCount < dbCoupon.maxUses) &&
+        (!dbCoupon.minOrderAmount || calculatedSubtotal >= dbCoupon.minOrderAmount)
+      ) {
+        appliedCouponId = dbCoupon.id;
+        validCouponCode = dbCoupon.code;
+        if (dbCoupon.discountType === 'PERCENTAGE') {
+          calculatedDiscount = Math.round(((calculatedSubtotal * dbCoupon.discountValue) / 100) * 100) / 100;
+        } else {
+          calculatedDiscount = Math.min(dbCoupon.discountValue, calculatedSubtotal);
+        }
+      }
+    }
+
+    const calculatedTotal = Math.max(0, calculatedSubtotal - calculatedDiscount);
     const orderNumber = `SUP-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // 4. Atomic database write & inventory decrement inside single transaction
@@ -133,6 +162,13 @@ export async function POST(request: Request) {
           }
         }
 
+        if (appliedCouponId) {
+          await tx.coupon.update({
+            where: { id: appliedCouponId },
+            data: { usedCount: { increment: 1 } },
+          });
+        }
+
         const createdOrder = await tx.order.create({
           data: {
             orderNumber,
@@ -143,6 +179,8 @@ export async function POST(request: Request) {
             address,
             notes: notes ? String(notes).slice(0, 500) : '',
             subtotal: calculatedSubtotal,
+            discount: calculatedDiscount,
+            couponCode: validCouponCode,
             shippingFee: verifiedShippingFee,
             total: calculatedTotal,
             status: 'NEW',

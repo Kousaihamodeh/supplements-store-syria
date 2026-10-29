@@ -182,6 +182,39 @@ export function Footer() {
           </Link>
         </div>
       </div>
+
+      {/* Developer Credit & Portfolio Bar */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 mt-6 border-t border-dark-900/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-400">
+        <div className="flex items-center gap-2">
+          <span className="text-zinc-500">
+            {locale === 'ar' ? 'تصميم وتطوير الموقع بواسطة:' : 'Designed & Developed by:'}
+          </span>
+          <span className="font-extrabold text-white tracking-wide">Kousai Hamodeh</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <a
+            href="https://instagram.com/kousai.hamodeh"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-pink-400 transition-colors group"
+            title="Instagram: @kousai.hamodeh"
+          >
+            <Instagram className="w-3.5 h-3.5 text-pink-400 group-hover:scale-110 transition-transform" />
+            <span className="dir-ltr font-mono font-medium">@kousai.hamodeh</span>
+          </a>
+          <span className="text-dark-700">•</span>
+          <a
+            href="https://wa.me/963936088406"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-emerald-400 transition-colors group"
+            title="WhatsApp: 0936088406"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span className="dir-ltr font-mono font-medium">0936088406</span>
+          </a>
+        </div>
+      </div>
     </footer>
   );
 }

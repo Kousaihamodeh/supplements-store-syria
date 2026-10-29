@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatPrice } from '@/lib/utils';
-import { Eye, Phone, MapPin, CheckCircle, Clock, Truck, XCircle, X } from 'lucide-react';
+import { formatPrice, formatShippingFee } from '@/lib/utils';
+import { Eye, Phone, MapPin, CheckCircle, Clock, Truck, XCircle, X, Ticket } from 'lucide-react';
 
 export default function OrderManagementClient({ initialOrders }: { initialOrders: any[] }) {
   const router = useRouter();
@@ -154,6 +154,18 @@ export default function OrderManagementClient({ initialOrders }: { initialOrders
               <p><strong className="text-white">الهاتف:</strong> {activeModalOrder.customerPhone}</p>
               <p><strong className="text-white">المحافظة والمنطقة:</strong> {activeModalOrder.governorate} - {activeModalOrder.cityArea}</p>
               <p><strong className="text-white">العنوان:</strong> {activeModalOrder.address}</p>
+              <p>
+                <strong className="text-white">أجور التوصيل / الشحن:</strong>{' '}
+                <span className="text-neon font-bold">
+                  {formatShippingFee(activeModalOrder.shippingFee, activeModalOrder.governorate, 'ar')}
+                </span>
+              </p>
+              {activeModalOrder.couponCode && (
+                <p className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                  <Ticket className="w-3.5 h-3.5" />
+                  <span>كوبون الخصم: {activeModalOrder.couponCode} (خصم: {activeModalOrder.discount} $)</span>
+                </p>
+              )}
               {activeModalOrder.notes && <p><strong className="text-white">ملاحظات:</strong> {activeModalOrder.notes}</p>}
             </div>
 
@@ -175,7 +187,7 @@ export default function OrderManagementClient({ initialOrders }: { initialOrders
             </div>
 
             <div className="border-t border-dark-800 pt-3 flex justify-between font-black text-base text-neon">
-              <span>المجموع الكلي:</span>
+              <span>إجمالي المنتجات:</span>
               <span>{formatPrice(activeModalOrder.total, 'ar')}</span>
             </div>
           </div>

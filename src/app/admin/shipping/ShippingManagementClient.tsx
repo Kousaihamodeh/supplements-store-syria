@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Edit, Trash2 } from 'lucide-react';
+import { formatShippingFee } from '@/lib/utils';
 
 export default function ShippingManagementClient({ initialAreas }: { initialAreas: any[] }) {
   const router = useRouter();
-  const [formData, setFormData] = useState({ governorateAr: '', governorateEn: '', shippingFee: 20000 });
+  const [formData, setFormData] = useState({ governorateAr: '', governorateEn: '', shippingFee: 25000 });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,7 +26,7 @@ export default function ShippingManagementClient({ initialAreas }: { initialArea
 
       if (!res.ok) throw new Error('فشل الحفظ');
 
-      setFormData({ governorateAr: '', governorateEn: '', shippingFee: 20000 });
+      setFormData({ governorateAr: '', governorateEn: '', shippingFee: 25000 });
       setEditingId(null);
       router.refresh();
     } catch (err: any) {
@@ -70,14 +71,18 @@ export default function ShippingManagementClient({ initialAreas }: { initialArea
           </div>
 
           <div>
-            <label className="font-bold text-zinc-300 block mb-1">أجور الشحن ($) *</label>
+            <label className="font-bold text-zinc-300 block mb-1">أجور التوصيل / الشحن (ليرة سورية) *</label>
             <input
               type="number"
               required
               value={formData.shippingFee}
               onChange={(e) => setFormData({ ...formData, shippingFee: parseFloat(e.target.value || '0') })}
-              className="w-full bg-dark-950 border border-dark-700 rounded-xl py-2 px-3 text-white focus:border-neon"
+              className="w-full bg-dark-950 border border-dark-700 rounded-xl py-2 px-3 text-white focus:border-neon font-bold"
+              placeholder="30000 لدمشق أو 25000 للمحافظات (0 لريف دمشق للتواصل المباشر)"
             />
+            <p className="text-[10px] text-zinc-400 mt-1">
+              * ملحوظة: إذا تم وضع 0 أو ريف دمشق، سيظهر للزبون &quot;سيتم التواصل معك وتحديد الأجرة&quot;.
+            </p>
           </div>
 
           <button
@@ -96,7 +101,7 @@ export default function ShippingManagementClient({ initialAreas }: { initialArea
               <tr>
                 <th className="p-4">المحافظة</th>
                 <th className="p-4">English Name</th>
-                <th className="p-4">أجور الشحن</th>
+                <th className="p-4">أجور التوصيل والشحن</th>
                 <th className="p-4 text-center">الإجراءات</th>
               </tr>
             </thead>
@@ -105,7 +110,9 @@ export default function ShippingManagementClient({ initialAreas }: { initialArea
                 <tr key={area.id} className="hover:bg-dark-950/50">
                   <td className="p-4 font-bold text-white">{area.governorateAr}</td>
                   <td className="p-4 font-mono">{area.governorateEn}</td>
-                  <td className="p-4 font-extrabold text-neon">{area.shippingFee.toLocaleString()} $</td>
+                  <td className="p-4 font-extrabold text-neon">
+                    {formatShippingFee(area.shippingFee, area.governorateAr, 'ar')}
+                  </td>
                   <td className="p-4 flex items-center justify-center gap-2">
                     <button
                       onClick={() => {
