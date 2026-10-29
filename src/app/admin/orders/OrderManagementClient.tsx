@@ -94,7 +94,16 @@ export default function OrderManagementClient({ initialOrders }: { initialOrders
               ) : (
                 filteredOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-dark-950/50">
-                    <td className="p-4 font-mono font-bold text-neon">{o.orderNumber}</td>
+                    <td className="p-4 font-mono font-bold text-neon">
+                      <div>{o.orderNumber}</div>
+                      <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                        o.paymentMethod === 'SHAM_CASH'
+                          ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                          : 'bg-dark-950 text-zinc-400 border border-dark-700'
+                      }`}>
+                        {o.paymentMethod === 'SHAM_CASH' ? '📱 شام كاش' : '💵 كاش'}
+                      </span>
+                    </td>
                     <td className="p-4">
                       <div className="font-bold text-white">{o.customerName}</div>
                       <div className="text-[11px] text-zinc-400 font-mono">{o.customerPhone}</div>
@@ -154,6 +163,16 @@ export default function OrderManagementClient({ initialOrders }: { initialOrders
               <p><strong className="text-white">الهاتف:</strong> {activeModalOrder.customerPhone}</p>
               <p><strong className="text-white">المحافظة والمنطقة:</strong> {activeModalOrder.governorate} - {activeModalOrder.cityArea}</p>
               <p><strong className="text-white">العنوان:</strong> {activeModalOrder.address}</p>
+              <p>
+                <strong className="text-white">طريقة الدفع:</strong>{' '}
+                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                  activeModalOrder.paymentMethod === 'SHAM_CASH'
+                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                    : 'bg-dark-950 text-zinc-300 border border-dark-700'
+                }`}>
+                  {activeModalOrder.paymentMethod === 'SHAM_CASH' ? '📱 تحويل شام كاش (Sham Cash)' : '💵 الدفع نقداً عند الاستلام'}
+                </span>
+              </p>
               <p>
                 <strong className="text-white">أجور التوصيل / الشحن:</strong>{' '}
                 <span className="text-neon font-bold">

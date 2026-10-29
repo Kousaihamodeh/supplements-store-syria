@@ -31,7 +31,7 @@ function resolveDatabaseUrl(): string {
       }
 
       if (fs.existsSync(tmpDbPath)) {
-        return `file:${tmpDbPath}?connection_limit=1`;
+        return `file:${tmpDbPath}`;
       }
     } catch (err) {
       console.error('Vercel /tmp database setup warning:', err);

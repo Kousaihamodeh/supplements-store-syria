@@ -2,11 +2,28 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/providers/LanguageProvider';
 import { useCart } from '@/components/providers/CartProvider';
 import { formatPrice, formatShippingFee } from '@/lib/utils';
-import { ShoppingBag, CheckCircle, MessageCircle, ArrowLeft, ArrowRight, ShieldCheck, MapPin, Truck, Ticket, Tag } from 'lucide-react';
+import {
+  ShoppingBag,
+  CheckCircle,
+  MessageCircle,
+  ArrowLeft,
+  ArrowRight,
+  ShieldCheck,
+  MapPin,
+  Truck,
+  Ticket,
+  Tag,
+  CreditCard,
+  Banknote,
+  QrCode,
+  Copy,
+  Check,
+} from 'lucide-react';
 
 interface ShippingArea {
   id: string;
@@ -24,6 +41,10 @@ export default function CheckoutPage() {
   const [shippingAreas, setShippingAreas] = useState<ShippingArea[]>([]);
   const [selectedGovernorate, setSelectedGovernorate] = useState<string>('دمشق');
   const [shippingFee, setShippingFee] = useState<number>(30000);
+
+  // Payment Method State
+  const [paymentMethod, setPaymentMethod] = useState<'CASH_ON_DELIVERY' | 'SHAM_CASH'>('CASH_ON_DELIVERY');
+  const [copiedCode, setCopiedCode] = useState(false);
 
   // Coupon state
   const [couponInput, setCouponInput] = useState<string>('');
@@ -105,6 +126,12 @@ export default function CheckoutPage() {
     setCouponError(null);
   };
 
+  const handleCopyShamCash = () => {
+    navigator.clipboard.writeText('48dcad728c1b5da891f804942f8fc9fd');
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2500);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -134,6 +161,7 @@ export default function CheckoutPage() {
           notes: formData.notes,
           shippingFee,
           couponCode: appliedCoupon ? appliedCoupon.code : null,
+          paymentMethod,
           items: cartItems.map((item) => ({
             productId: item.productId,
             nameAr: item.nameAr,
@@ -163,6 +191,9 @@ export default function CheckoutPage() {
         const couponText = appliedCoupon 
           ? `\n🎟️ كوبون خصم: ${appliedCoupon.code} (-${appliedCoupon.discountAmount} $)`
           : '';
+        const paymentMethodText = paymentMethod === 'SHAM_CASH'
+          ? '💳 طريقة الدفع: شام كاش (المستفيد: حسين علي سفر - 48dcad728c1b5da891f804942f8fc9fd)'
+          : '💵 طريقة الدفع: الدفع عند الاستلام (كاش)';
 
         const text = encodeURIComponent(
           `*طلب جديد من موقع SUPPLEMENTS STORE*\n` +
@@ -178,7 +209,8 @@ export default function CheckoutPage() {
           `\n\nالمجموع الفرعي للمنتجات: ${cartTotal} $` +
           couponText +
           `\n*إجمالي المنتجات: ${productsFinalTotal} $*` +
-          `\nأجور التوصيل/الشحن: ${shippingText}`
+          `\nأجور التوصيل/الشحن: ${shippingText}\n` +
+          paymentMethodText
         );
         window.open(`https://wa.me/963938229497?text=${text}`, '_blank');
       }
@@ -210,6 +242,12 @@ export default function CheckoutPage() {
           <div className="flex justify-between border-b border-dark-800 pb-2">
             <span>{isRtl ? 'المحافظة والعنوان:' : 'Address:'}</span>
             <span className="font-bold text-white">{orderCreated.governorate} - {orderCreated.address}</span>
+          </div>
+          <div className="flex justify-between border-b border-dark-800 pb-2">
+            <span>{isRtl ? 'طريقة الدفع:' : 'Payment Method:'}</span>
+            <span className="font-bold text-white">
+              {orderCreated.paymentMethod === 'SHAM_CASH' ? '📱 شام كاش (Sham Cash)' : '💵 الدفع عند الاستلام (كاش)'}
+            </span>
           </div>
           {orderCreated.discount > 0 && (
             <div className="flex justify-between border-b border-dark-800 pb-2 text-emerald-400 font-bold">
@@ -267,106 +305,237 @@ export default function CheckoutPage() {
 
       <form onSubmit={(e) => handleSubmitOrder(e, false)} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left Column: Customer Form */}
-        <div className="lg:col-span-7 bg-dark-900 p-6 sm:p-8 rounded-2xl border border-dark-800 space-y-6">
-          <h2 className="text-lg font-black text-white flex items-center gap-2">
-            <UserIcon className="w-5 h-5 text-neon" />
-            <span>{t.customerInformation}</span>
-          </h2>
+        {/* Left Column: Customer Form & Payment Method */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="bg-dark-900 p-6 sm:p-8 rounded-2xl border border-dark-800 space-y-6">
+            <h2 className="text-lg font-black text-white flex items-center gap-2">
+              <UserIcon className="w-5 h-5 text-neon" />
+              <span>{t.customerInformation}</span>
+            </h2>
 
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                {t.fullName} *
-              </label>
-              <input
-                type="text"
-                name="fullName"
-                required
-                value={formData.fullName}
-                onChange={handleInputChange}
-                placeholder={isRtl ? 'أدخل اسمك الثلاثي' : 'Enter your full name'}
-                className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                {t.phone} *
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                required
-                value={formData.phone}
-                onChange={handleInputChange}
-                placeholder="09XXXXXXXX"
-                className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none dir-ltr"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                  {t.governorate} *
-                </label>
-                <select
-                  value={selectedGovernorate}
-                  onChange={(e) => handleGovernorateChange(e.target.value)}
-                  className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
-                >
-                  {shippingAreas.map((area) => (
-                    <option key={area.id} value={area.governorateAr}>
-                      {isRtl ? area.governorateAr : area.governorateEn} ({formatShippingFee(area.shippingFee, area.governorateAr, locale)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                  {t.cityArea} *
+                  {t.fullName} *
                 </label>
                 <input
                   type="text"
-                  name="cityArea"
+                  name="fullName"
                   required
-                  value={formData.cityArea}
+                  value={formData.fullName}
                   onChange={handleInputChange}
-                  placeholder={isRtl ? 'مثال: جرمانا / الشعلان' : 'e.g. Jaramana / Al-Shaalan'}
+                  placeholder={isRtl ? 'أدخل اسمك الثلاثي' : 'Enter your full name'}
                   className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
                 />
               </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                  {t.phone} *
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  required
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  placeholder="09XXXXXXXX"
+                  className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none dir-ltr"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                    {t.governorate} *
+                  </label>
+                  <select
+                    value={selectedGovernorate}
+                    onChange={(e) => handleGovernorateChange(e.target.value)}
+                    className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
+                  >
+                    {shippingAreas.map((area) => (
+                      <option key={area.id} value={area.governorateAr}>
+                        {isRtl ? area.governorateAr : area.governorateEn} ({formatShippingFee(area.shippingFee, area.governorateAr, locale)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                    {t.cityArea} *
+                  </label>
+                  <input
+                    type="text"
+                    name="cityArea"
+                    required
+                    value={formData.cityArea}
+                    onChange={handleInputChange}
+                    placeholder={isRtl ? 'مثال: جرمانا / الشعلان' : 'e.g. Jaramana / Al-Shaalan'}
+                    className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                  {t.addressDetails} *
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  required
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  placeholder={isRtl ? 'الشارع - البناء - الطابق' : 'Street - Building - Floor'}
+                  className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                  {t.orderNotes}
+                </label>
+                <textarea
+                  name="notes"
+                  rows={3}
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  placeholder={isRtl ? 'أي توجيهات خاصة بالتوصيل...' : 'Any special delivery instructions...'}
+                  className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Method Selector Section */}
+          <div className="bg-dark-900 p-6 sm:p-8 rounded-2xl border border-dark-800 space-y-4 shadow-xl">
+            <h2 className="text-lg font-black text-white flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-neon" />
+              <span>{isRtl ? 'اختر طريقة الدفع' : 'Select Payment Method'}</span>
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Cash on Delivery option */}
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('CASH_ON_DELIVERY')}
+                className={`p-4 rounded-xl border-2 text-right transition-all flex items-start gap-3 ${
+                  paymentMethod === 'CASH_ON_DELIVERY'
+                    ? 'border-neon bg-neon/10 text-white shadow-md'
+                    : 'border-dark-700 bg-dark-950 text-zinc-300 hover:border-dark-600'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center shrink-0 ${
+                  paymentMethod === 'CASH_ON_DELIVERY' ? 'border-neon bg-neon text-dark-950' : 'border-zinc-500'
+                }`}>
+                  {paymentMethod === 'CASH_ON_DELIVERY' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm flex items-center gap-1.5">
+                    <Banknote className="w-4 h-4 text-neon" />
+                    <span>{isRtl ? 'الدفع عند الاستلام (كاش)' : 'Cash on Delivery'}</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    {isRtl ? 'تدفع نقداً لمندوب التوصيل أو مكتب الشحن عند استلام طلبك.' : 'Pay cash upon delivery or courier pickup.'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Sham Cash option */}
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('SHAM_CASH')}
+                className={`p-4 rounded-xl border-2 text-right transition-all flex items-start gap-3 ${
+                  paymentMethod === 'SHAM_CASH'
+                    ? 'border-cyan-400 bg-cyan-950/30 text-white shadow-md ring-1 ring-cyan-400/40'
+                    : 'border-dark-700 bg-dark-950 text-zinc-300 hover:border-cyan-800'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center shrink-0 ${
+                  paymentMethod === 'SHAM_CASH' ? 'border-cyan-400 bg-cyan-400 text-dark-950' : 'border-zinc-500'
+                }`}>
+                  {paymentMethod === 'SHAM_CASH' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm flex items-center gap-1.5 text-cyan-300">
+                    <QrCode className="w-4 h-4 text-cyan-400" />
+                    <span>{isRtl ? 'شام كاش (Sham Cash)' : 'Sham Cash Digital Wallet'}</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    {isRtl ? 'تحويل فوري عبر تطبيق شام كاش أو مسح رمز الـ QR.' : 'Instant transfer via Sham Cash app or QR code scan.'}
+                  </p>
+                </div>
+              </button>
             </div>
 
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                {t.addressDetails} *
-              </label>
-              <input
-                type="text"
-                name="address"
-                required
-                value={formData.address}
-                onChange={handleInputChange}
-                placeholder={isRtl ? 'الشارع - البناء - الطابق' : 'Street - Building - Floor'}
-                className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
-              />
-            </div>
+            {/* Sham Cash Info & QR Card */}
+            {paymentMethod === 'SHAM_CASH' && (
+              <div className="p-5 bg-gradient-to-br from-cyan-950/40 via-dark-950 to-blue-950/30 border-2 border-cyan-500/50 rounded-2xl space-y-4 animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-cyan-900/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></div>
+                    <span className="font-black text-cyan-300 text-sm">بيانات حساب شام كاش للتحويل</span>
+                  </div>
+                  <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded-full font-bold">
+                    حساب معتمد
+                  </span>
+                </div>
 
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                {t.orderNotes}
-              </label>
-              <textarea
-                name="notes"
-                rows={3}
-                value={formData.notes}
-                onChange={handleInputChange}
-                placeholder={isRtl ? 'أي توجيهات خاصة بالتوصيل...' : 'Any special delivery instructions...'}
-                className="w-full bg-dark-950 border border-dark-700 rounded-xl py-3 px-4 text-sm text-white focus:border-neon focus:outline-none"
-              ></textarea>
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+                  <div className="sm:col-span-7 space-y-3 text-xs">
+                    <div>
+                      <span className="text-zinc-400 block mb-0.5 font-bold">اسم صاحب الحساب:</span>
+                      <div className="font-black text-white text-base">حسين علي سفر</div>
+                    </div>
+
+                    <div>
+                      <span className="text-zinc-400 block mb-1 font-bold">رمز الحساب (Wallet Code):</span>
+                      <div className="flex items-center gap-2 bg-dark-900 border border-cyan-800/80 rounded-xl p-2.5 font-mono text-cyan-300 text-xs dir-ltr select-all">
+                        <span className="truncate flex-1 font-extrabold">48dcad728c1b5da891f804942f8fc9fd</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyShamCash}
+                          className="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-dark-950 font-bold rounded-lg text-xs flex items-center gap-1 shrink-0 transition-colors"
+                        >
+                          {copiedCode ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>تم النسخ!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>نسخ</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-300 leading-relaxed bg-dark-900/60 p-2.5 rounded-xl border border-dark-800">
+                      💡 <strong>طريقة الدفع:</strong> حوّل المبلغ عبر تطبيق شام كاش، ثم اضغط على زر <strong>إرسال الطلب عبر واتساب</strong> أدناه لإرسال الطلب وإشعار التحويل مباشرةً.
+                    </p>
+                  </div>
+
+                  {/* QR Code Display */}
+                  <div className="sm:col-span-5 flex flex-col items-center justify-center p-3 bg-dark-900 rounded-2xl border border-cyan-800/50 text-center">
+                    <div className="relative w-36 h-36 rounded-xl overflow-hidden border-2 border-cyan-400/80 shadow-lg">
+                      <Image
+                        src="/images/shamcash-qr.jpg"
+                        alt="شام كاش - حسين علي سفر"
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                    <span className="text-[10px] text-cyan-300 font-bold mt-2">
+                      امسح الـ QR عبر تطبيق شام كاش
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -454,6 +623,13 @@ export default function CheckoutPage() {
               <span>{t.shippingFee} ({selectedGovernorate})</span>
               <span className="font-bold text-zinc-100">
                 {formatShippingFee(shippingFee, selectedGovernorate, locale)}
+              </span>
+            </div>
+
+            <div className="flex justify-between text-zinc-300 text-xs pt-1 border-t border-dark-800/50">
+              <span>طريقة الدفع:</span>
+              <span className="font-bold text-white">
+                {paymentMethod === 'SHAM_CASH' ? '📱 شام كاش' : '💵 كاش عند الاستلام'}
               </span>
             </div>
           </div>

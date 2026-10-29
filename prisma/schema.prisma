@@ -114,6 +114,7 @@ model Order {
   couponCode    String?
   shippingFee   Float       @default(0)
   total         Float
+  paymentMethod String      @default("CASH_ON_DELIVERY")
 
   status        String      @default("NEW") // NEW, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED
   items         OrderItem[]

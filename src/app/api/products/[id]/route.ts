@@ -39,7 +39,7 @@ export async function PUT(
   try {
     const admin = await getAdminFromCookies();
     if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'غير مصرح، يرجى تسجيل الدخول مجدداً' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -62,63 +62,75 @@ export async function PUT(
       variants,
     } = body;
 
-    // Execute in a single atomic database transaction
-    const updated = await db.$transaction(async (tx) => {
-      // Delete existing images & variants to rebuild fresh
-      await tx.productImage.deleteMany({ where: { productId: params.id } });
-      await tx.productVariant.deleteMany({ where: { productId: params.id } });
+    const parsedPrice = parseFloat(String(price || 0)) || 0;
+    const parsedOldPrice = oldPrice ? parseFloat(String(oldPrice)) || null : null;
+    const parsedStock = parseInt(String(stock || 0), 10) || 0;
 
-      return await tx.product.update({
-        where: { id: params.id },
-        data: {
-          nameAr,
-          nameEn,
-          descriptionAr: descriptionAr || '',
-          descriptionEn: descriptionEn || '',
-          price: parseFloat(price),
-          oldPrice: oldPrice ? parseFloat(oldPrice) : null,
-          sku,
-          stock: parseInt(stock),
-          categoryId,
-          brandId: brandId || null,
-          isFeatured: Boolean(isFeatured),
-          isBestSeller: Boolean(isBestSeller),
-          isNew: Boolean(isNew),
-          isOnSale: Boolean(isOnSale),
-          images: {
-            create: (() => {
-              const hasMain = (images || []).some((img: any) => Boolean(img.isMain));
-              return (images || []).map((img: any, idx: number) => ({
-                url: img.url,
-                isMain: hasMain ? Boolean(img.isMain) : idx === 0,
-                sortOrder: img.sortOrder ?? idx,
-              }));
-            })(),
-          },
-          variants: {
-            create: (variants || []).map((v: any) => ({
-              size: v.size || null,
-              flavor: v.flavor || null,
-              priceAdjustment: parseFloat(v.priceAdjustment || 0),
-              stock: parseInt(v.stock || stock || 10),
-              sku: v.sku || null,
-            })),
-          },
+    // Delete existing images & variants sequentially without exclusive transaction locks
+    await db.productImage.deleteMany({ where: { productId: params.id } });
+    await db.productVariant.deleteMany({ where: { productId: params.id } });
+
+    const hasMain = (images || []).some((img: any) => Boolean(img.isMain));
+    const formattedImages = (images || []).map((img: any, idx: number) => ({
+      url: img.url,
+      isMain: hasMain ? Boolean(img.isMain) : idx === 0,
+      sortOrder: img.sortOrder ?? idx,
+    }));
+
+    const formattedVariants = (variants || []).map((v: any) => ({
+      size: v.size || null,
+      flavor: v.flavor || null,
+      priceAdjustment: parseFloat(String(v.priceAdjustment || 0)) || 0,
+      stock: parseInt(String(v.stock || parsedStock || 10), 10) || 10,
+      sku: v.sku || null,
+    }));
+
+    const updated = await db.product.update({
+      where: { id: params.id },
+      data: {
+        nameAr: String(nameAr || '').trim(),
+        nameEn: String(nameEn || '').trim(),
+        descriptionAr: descriptionAr || '',
+        descriptionEn: descriptionEn || '',
+        price: parsedPrice,
+        oldPrice: parsedOldPrice,
+        sku: String(sku || '').trim(),
+        stock: parsedStock,
+        categoryId,
+        brandId: brandId || null,
+        isFeatured: Boolean(isFeatured),
+        isBestSeller: Boolean(isBestSeller),
+        isNew: Boolean(isNew),
+        isOnSale: Boolean(isOnSale),
+        images: {
+          create: formattedImages,
         },
-        include: {
-          images: true,
-          variants: true,
+        variants: {
+          create: formattedVariants,
         },
-      });
+      },
+      include: {
+        images: true,
+        variants: true,
+      },
     });
 
-    autoBackupSafe();
-    revalidatePath('/', 'layout');
+    try {
+      autoBackupSafe();
+    } catch (e) {}
+
+    try {
+      revalidatePath('/admin/products');
+      revalidatePath('/shop');
+      revalidatePath('/');
+      revalidatePath(`/product/${params.id}`);
+      if (updated.slug) revalidatePath(`/product/${updated.slug}`);
+    } catch (e) {}
 
     return NextResponse.json(updated);
   } catch (error: any) {
     console.error('Update product error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update product' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'فشل في تعديل المنتج' }, { status: 500 });
   }
 }
 
@@ -156,8 +168,15 @@ export async function PATCH(
       data: dataToUpdate,
     });
 
-    autoBackupSafe();
-    revalidatePath('/', 'layout');
+    try {
+      autoBackupSafe();
+    } catch (e) {}
+
+    try {
+      revalidatePath('/admin/products');
+      revalidatePath('/shop');
+      revalidatePath('/');
+    } catch (e) {}
 
     return NextResponse.json(updated);
   } catch (error: any) {
@@ -180,8 +199,15 @@ export async function DELETE(
       where: { id: params.id },
     });
 
-    autoBackupSafe();
-    revalidatePath('/', 'layout');
+    try {
+      autoBackupSafe();
+    } catch (e) {}
+
+    try {
+      revalidatePath('/admin/products');
+      revalidatePath('/shop');
+      revalidatePath('/');
+    } catch (e) {}
 
     return NextResponse.json({ success: true });
   } catch (error) {

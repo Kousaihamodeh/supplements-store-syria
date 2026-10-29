@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   try {
     const admin = await getAdminFromCookies();
     if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'غير مصرح، يرجى تسجيل الدخول مجدداً' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     } = body;
 
     if (!nameAr || !nameEn || !price || !categoryId || !sku) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json({ error: 'يرجى ملء جميع الحقول المطلوبة (الاسمين، السعر، القسم، ورمز SKU)' }, { status: 400 });
     }
 
     const baseSlug = generateSlug(nameEn);
@@ -102,17 +102,36 @@ export async function POST(request: Request) {
       slug = `${baseSlug}-${count++}`;
     }
 
+    const parsedPrice = parseFloat(String(price || 0)) || 0;
+    const parsedOldPrice = oldPrice ? parseFloat(String(oldPrice)) || null : null;
+    const parsedStock = parseInt(String(stock || 0), 10) || 0;
+
+    const hasMain = (images || []).some((img: any) => Boolean(img.isMain));
+    const formattedImages = (images || []).map((img: any, idx: number) => ({
+      url: img.url,
+      isMain: hasMain ? Boolean(img.isMain) : idx === 0,
+      sortOrder: img.sortOrder ?? idx,
+    }));
+
+    const formattedVariants = (variants || []).map((v: any) => ({
+      size: v.size || null,
+      flavor: v.flavor || null,
+      priceAdjustment: parseFloat(String(v.priceAdjustment || 0)) || 0,
+      stock: parseInt(String(v.stock || parsedStock || 10), 10) || 10,
+      sku: v.sku || null,
+    }));
+
     const product = await db.product.create({
       data: {
-        nameAr,
-        nameEn,
+        nameAr: String(nameAr).trim(),
+        nameEn: String(nameEn).trim(),
         slug,
         descriptionAr: descriptionAr || '',
         descriptionEn: descriptionEn || '',
-        price: parseFloat(price),
-        oldPrice: oldPrice ? parseFloat(oldPrice) : null,
-        sku,
-        stock: parseInt(stock) || 0,
+        price: parsedPrice,
+        oldPrice: parsedOldPrice,
+        sku: String(sku).trim(),
+        stock: parsedStock,
         categoryId,
         brandId: brandId || null,
         isFeatured: Boolean(isFeatured),
@@ -120,23 +139,10 @@ export async function POST(request: Request) {
         isNew: Boolean(isNew),
         isOnSale: Boolean(isOnSale),
         images: {
-          create: (() => {
-            const hasMain = (images || []).some((img: any) => Boolean(img.isMain));
-            return (images || []).map((img: any, idx: number) => ({
-              url: img.url,
-              isMain: hasMain ? Boolean(img.isMain) : idx === 0,
-              sortOrder: img.sortOrder ?? idx,
-            }));
-          })(),
+          create: formattedImages,
         },
         variants: {
-          create: (variants || []).map((v: any) => ({
-            size: v.size || null,
-            flavor: v.flavor || null,
-            priceAdjustment: parseFloat(v.priceAdjustment || 0),
-            stock: parseInt(v.stock || stock || 10),
-            sku: v.sku || null,
-          })),
+          create: formattedVariants,
         },
       },
       include: {
@@ -145,12 +151,19 @@ export async function POST(request: Request) {
       },
     });
 
-    autoBackupSafe();
-    revalidatePath('/', 'layout');
+    try {
+      autoBackupSafe();
+    } catch (e) {}
+
+    try {
+      revalidatePath('/admin/products');
+      revalidatePath('/shop');
+      revalidatePath('/');
+    } catch (e) {}
 
     return NextResponse.json(product, { status: 201 });
   } catch (error: any) {
     console.error('Create product error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to create product' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'فشل إنشاء المنتج' }, { status: 500 });
   }
 }

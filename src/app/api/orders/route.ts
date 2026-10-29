@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       shippingFee,
       isDirectShippingOrder,
       couponCode,
+      paymentMethod,
     } = body;
 
     // 1. Server-side validation of customer info
@@ -183,6 +184,7 @@ export async function POST(request: Request) {
             couponCode: validCouponCode,
             shippingFee: verifiedShippingFee,
             total: calculatedTotal,
+            paymentMethod: paymentMethod === 'SHAM_CASH' ? 'SHAM_CASH' : 'CASH_ON_DELIVERY',
             status: 'NEW',
             items: {
               create: verifiedItems.map((vi) => ({
