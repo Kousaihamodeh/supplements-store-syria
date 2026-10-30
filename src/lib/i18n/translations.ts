@@ -40,7 +40,7 @@ export const translations = {
     storeAddressLabel: 'العنوان الرسمي:',
     storeAddressValue: 'دمشق – جرمانا – ساحة الكرامة – مقابل MTN',
     openInGoogleMaps: 'افتح في خرائط جوجل',
-    storeWorkingHours: 'ساعات العمل: يومياً من 10:00 صباحاً حتى 10:00 مساءً',
+    storeWorkingHours: 'ساعات العمل: يومياً من 11:00 صباحاً حتى 11:00 مساءً | الجمعة من 5:00 مساءً حتى 11:00 مساءً',
     shippingAcrossSyria: 'شحن إلى جميع المحافظات السورية',
     fastDeliveryGuarantee: 'توصيل سريع وسليم لحافة باب منزلك',
 
@@ -175,7 +175,7 @@ export const translations = {
     storeAddressLabel: 'Official Address:',
     storeAddressValue: 'Damascus – Jaramana – Al-Karama Square – opposite MTN',
     openInGoogleMaps: 'Open in Google Maps',
-    storeWorkingHours: 'Working Hours: Daily from 10:00 AM to 10:00 PM',
+    storeWorkingHours: 'Working Hours: Daily 11:00 AM – 11:00 PM | Friday 5:00 PM – 11:00 PM',
     shippingAcrossSyria: 'Delivery across Syrian governorates',
     fastDeliveryGuarantee: 'Fast, secure shipping straight to your doorstep',
 
